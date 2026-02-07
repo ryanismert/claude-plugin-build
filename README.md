@@ -2,9 +2,23 @@
 
 A Claude Code plugin for software development workflows. Currently includes an interactive PRD builder, with more skills planned.
 
-## Install
+## Install via Marketplace
 
-In any Claude Code session:
+**Step 1** — Add the marketplace (one-time):
+
+```
+/plugin marketplace add ryanismert/claude-plugin-build
+```
+
+**Step 2** — Install the plugin:
+
+```
+/plugin install build@claude-plugin-build
+```
+
+Or browse interactively with `/plugin` → Discover tab.
+
+### Alternative: Direct install
 
 ```
 /plugin install github:ryanismert/claude-plugin-build
@@ -33,7 +47,8 @@ Or just `/build:prd` and describe your idea when prompted.
 ```
 claude-plugin-build/
 ├── .claude-plugin/
-│   └── plugin.json              # Plugin manifest
+│   ├── plugin.json              # Plugin manifest
+│   └── marketplace.json         # Marketplace catalog
 └── skills/
     └── prd/
         ├── SKILL.md             # Skill definition + prompt
