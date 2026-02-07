@@ -1,0 +1,23 @@
+{
+  "name": "claude-plugin-build",
+  "owner": {
+    "name": "Ryan Ismert"
+  },
+  "metadata": {
+    "description": "Software development workflow skills for Claude Code. Currently includes an interactive PRD builder.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "build",
+      "source": ".",
+      "description": "Software development workflow skills including an interactive PRD builder.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Ryan Ismert"
+      },
+      "category": "productivity",
+      "tags": ["prd", "product-requirements", "planning", "sdlc"]
+    }
+  ]
+}
