@@ -27,7 +27,10 @@ After loading the PRD:
    - One paragraph restating the product goal from the PRD
    - Current tech stack / project structure observed
    - List of open items from the PRD that the design must resolve
-4. Proceed to Phase 1.
+4. **Ask the user to clarify codebase mapping and technology choices** before proceeding:
+   - **Codebase relationship:** How does this feature map to the existing codebase? Options to explore: modifying/extending an existing module, adding a new module within the current project, creating a standalone service/package, or building greenfield with no existing codebase. If the user points to specific directories or files, read them to understand the current implementation.
+   - **Technology decisions:** What specific languages, libraries, frameworks, and external APIs will be used? Confirm whether to follow the existing stack or introduce new technologies, and if new, why. Pin down concrete choices (e.g., "Express with Zod validation" not just "Node.js"; "PostgreSQL with Drizzle ORM" not just "SQL database"). These decisions become constraints for the rest of the design.
+5. Proceed to Phase 1 only after the codebase relationship and technology choices are established.
 
 ### Phase 1: Iterative Technical Design
 
