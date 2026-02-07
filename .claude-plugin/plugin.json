@@ -1,5 +1,5 @@
 {
   "name": "build",
-  "version": "1.0.0",
-  "description": "Claude Code plugin for software development workflows. Includes an interactive PRD builder and more."
+  "version": "1.1.0",
+  "description": "Claude Code plugin for software development workflows. Includes an interactive PRD builder (/build:prd) and technical design document builder (/build:design)."
 }
