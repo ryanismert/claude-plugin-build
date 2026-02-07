@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "build",
-      "source": ".",
+      "source": "./",
       "description": "Software development workflow skills including an interactive PRD builder.",
       "version": "1.0.0",
       "author": {
