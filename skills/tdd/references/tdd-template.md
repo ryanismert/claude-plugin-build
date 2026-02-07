@@ -30,28 +30,53 @@
 
 ---
 
-## 2. System Context
+## 2. Codebase Context & Technology Stack
 
-### 2.1 Current Architecture
+### 2.1 Codebase Relationship
+{How this feature maps to the existing codebase: modifying/extending an existing module, adding a new module, creating a standalone service, or greenfield. Reference specific directories and files.}
+
+- **Approach:** {Modify existing / New module / Standalone service / Greenfield}
+- **Affected areas:** {List specific directories, modules, or files that will be touched}
+
+### 2.2 Technology Stack
+| Layer | Technology | Version | Notes |
+|-------|-----------|---------|-------|
+| {e.g., Language} | {e.g., TypeScript} | {e.g., 5.x} | {existing / new, rationale if new} |
+| {e.g., Framework} | {e.g., Express} | {e.g., 4.18} | {} |
+| {e.g., ORM / DB Client} | {e.g., Drizzle ORM} | {} | {} |
+| {e.g., Database} | {e.g., PostgreSQL} | {e.g., 16} | {} |
+| {e.g., Validation} | {e.g., Zod} | {} | {} |
+| {e.g., Testing} | {e.g., Vitest} | {} | {} |
+
+### 2.3 External APIs & Services
+| Service | Purpose | Auth Method | Docs |
+|---------|---------|-------------|------|
+| {e.g., Stripe API} | {payments} | {API key} | {link} |
+
+---
+
+## 3. System Context
+
+### 3.1 Current Architecture
 {Brief description of the existing system as relevant to this design. Reference actual project structure.}
 
-### 2.2 Proposed Architecture
+### 3.2 Proposed Architecture
 
 ```mermaid
 graph TD
     {architecture diagram showing components and their relationships}
 ```
 
-### 2.3 Key Components
+### 3.3 Key Components
 | Component | Responsibility | New / Modified |
 |-----------|---------------|----------------|
 | {component} | {what it does} | {New / Modified / Existing} |
 
 ---
 
-## 3. Data Model
+## 4. Data Model
 
-### 3.1 Entities
+### 4.1 Entities
 
 #### {Entity Name}
 | Field | Type | Constraints | Notes |
@@ -60,26 +85,26 @@ graph TD
 
 {Repeat for each entity.}
 
-### 3.2 Entity Relationships
+### 4.2 Entity Relationships
 
 ```mermaid
 erDiagram
     {entity relationship diagram}
 ```
 
-### 3.3 Data Migration
+### 4.3 Data Migration
 {Describe any schema changes to existing data, migration strategy, and rollback plan. Write "N/A — greenfield" if no migrations needed.}
 
-### 3.4 Data Access Patterns
+### 4.4 Data Access Patterns
 | Operation | Pattern | Expected Volume | Index / Optimization |
 |-----------|---------|----------------|---------------------|
 | {e.g., "List user's projects"} | {read, paginated} | {e.g., "~100 req/s"} | {index on user_id} |
 
 ---
 
-## 4. API Design
+## 5. API Design
 
-### 4.1 New Endpoints / Interfaces
+### 5.1 New Endpoints / Interfaces
 
 #### `{METHOD} {path}`
 - **Description:** {what it does}
@@ -103,12 +128,12 @@ erDiagram
 
 {Repeat for each endpoint.}
 
-### 4.2 Modified Endpoints
+### 5.2 Modified Endpoints
 | Endpoint | Change | Backward Compatible |
 |----------|--------|--------------------|
 | {endpoint} | {what changes} | {Yes / No — migration plan} |
 
-### 4.3 Event / Message Contracts
+### 5.3 Event / Message Contracts
 {If the design includes async messaging (events, queues, webhooks), define the contracts here. Write "N/A" if purely synchronous.}
 
 | Event | Producer | Consumer(s) | Payload Shape |
@@ -117,16 +142,16 @@ erDiagram
 
 ---
 
-## 5. Key Sequences
+## 6. Key Sequences
 
-### 5.1 {Primary User Workflow Name}
+### 6.1 {Primary User Workflow Name}
 
 ```mermaid
 sequenceDiagram
     {sequence diagram for the primary happy-path flow}
 ```
 
-### 5.2 {Error / Edge Case Flow Name}
+### 6.2 {Error / Edge Case Flow Name}
 
 ```mermaid
 sequenceDiagram
@@ -137,22 +162,22 @@ sequenceDiagram
 
 ---
 
-## 6. Infrastructure & Operations
+## 7. Infrastructure & Operations
 
-### 6.1 Infrastructure Requirements
+### 7.1 Infrastructure Requirements
 | Resource | Purpose | Specification |
 |----------|---------|---------------|
 | {e.g., PostgreSQL} | {primary datastore} | {version, sizing, managed/self-hosted} |
 
-### 6.2 Scaling Strategy
+### 7.2 Scaling Strategy
 {How the system scales. Horizontal, vertical, auto-scaling triggers, queue-based backpressure, etc.}
 
-### 6.3 Failure Modes & Resilience
+### 7.3 Failure Modes & Resilience
 | Failure | Impact | Mitigation |
 |---------|--------|------------|
 | {e.g., "Database unavailable"} | {what breaks} | {retry, circuit breaker, fallback, etc.} |
 
-### 6.4 Observability
+### 7.4 Observability
 | Signal | Tool | Details |
 |--------|------|---------|
 | Metrics | {e.g., Prometheus} | {key metrics to track} |
@@ -162,22 +187,22 @@ sequenceDiagram
 
 ---
 
-## 7. Security & Privacy
+## 8. Security & Privacy
 
-### 7.1 Authentication & Authorization
+### 8.1 Authentication & Authorization
 {How users/services authenticate. What authorization model is used (RBAC, ABAC, etc.). Reference existing patterns if extending them.}
 
-### 7.2 Data Protection
+### 8.2 Data Protection
 | Data | Classification | Protection |
 |------|---------------|------------|
 | {e.g., "user email"} | {PII / sensitive / public} | {encryption at rest, in transit, access controls} |
 
-### 7.3 Compliance
+### 8.3 Compliance
 {Relevant regulatory or compliance requirements and how this design satisfies them. Write "No specific compliance requirements" if none.}
 
 ---
 
-## 8. Testing Strategy
+## 9. Testing Strategy
 
 | Level | Scope | Approach |
 |-------|-------|----------|
@@ -188,9 +213,9 @@ sequenceDiagram
 
 ---
 
-## 9. Alternatives Considered
+## 10. Alternatives Considered
 
-### 9.1 {Alternative Approach Name}
+### 10.1 {Alternative Approach Name}
 - **Description:** {what it is}
 - **Pros:** {advantages}
 - **Cons:** {disadvantages}
@@ -198,18 +223,18 @@ sequenceDiagram
 
 {Repeat for each alternative.}
 
-### 9.2 Key Trade-offs in Chosen Design
+### 10.2 Key Trade-offs in Chosen Design
 | Decision | Trade-off | Rationale |
 |----------|-----------|-----------|
 | {e.g., "SQL over NoSQL"} | {what you gain vs. lose} | {why this is the right call} |
 
 ---
 
-## 10. Implementation Guidance
+## 11. Implementation Guidance
 
 This section provides enough detail to derive a task-level work breakdown.
 
-### 10.1 Component Work Breakdown
+### 11.1 Component Work Breakdown
 
 #### {Component / Layer 1}
 | Work Item | Description | Dependencies | Complexity |
@@ -218,38 +243,38 @@ This section provides enough detail to derive a task-level work breakdown.
 
 {Repeat for each component or layer.}
 
-### 10.2 Suggested Implementation Order
+### 11.2 Suggested Implementation Order
 {Recommended sequencing of work. What should be built first to unblock other work? What can be parallelized?}
 
 1. **Phase 1:** {description — foundational work}
 2. **Phase 2:** {description — core feature work}
 3. **Phase 3:** {description — integration, polish, hardening}
 
-### 10.3 Dependencies & Blockers
+### 11.3 Dependencies & Blockers
 | Dependency | Owner | Status | Impact if Delayed |
 |------------|-------|--------|-------------------|
 | {e.g., "API gateway config"} | {team/person} | {Ready / In Progress / Blocked} | {what can't proceed} |
 
 ---
 
-## 11. Rollout Plan
+## 12. Rollout Plan
 
-### 11.1 Rollout Phases
+### 12.1 Rollout Phases
 | Phase | Audience | Criteria to Advance |
 |-------|----------|--------------------|
 | {e.g., "Internal dogfood"} | {who} | {what must be true to move to next phase} |
 
-### 11.2 Feature Flags
+### 12.2 Feature Flags
 | Flag | Purpose | Default |
 |------|---------|--------|
 | {flag name} | {what it controls} | {off / on} |
 
-### 11.3 Rollback Plan
+### 12.3 Rollback Plan
 {How to revert if something goes wrong. Include data rollback considerations.}
 
 ---
 
-## 12. Open Questions & Risks
+## 13. Open Questions & Risks
 | Item | Type | Impact | Owner | Status |
 |------|------|--------|-------|--------|
 | {item} | Risk / Question | {H/M/L} | {who will resolve} | Open |
