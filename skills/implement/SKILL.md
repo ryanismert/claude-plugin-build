@@ -22,7 +22,35 @@ Before executing any tasks, verify the project is set up for automated execution
 4. If no plan is found, tell the user to run `/build:plan` first and stop.
 5. Read the plan file. Extract the `CLAUDE_CODE_TASK_LIST_ID` and verify it matches the active task list by calling `TaskList`. If there are no tasks or the IDs don't match, ask the user to re-run `/build:plan`.
 
-#### 0.2 — Dependency installation script
+#### 0.2 — Blocker check
+
+Before any work begins, check for unresolved blockers that could prevent tasks from completing.
+
+**Check the plan file.** Read the "Open Risks" section of the plan document. If any risks are flagged as blocking, present them to the user and ask whether they've been resolved.
+
+**Check the task list for external dependency tasks.** `/build:plan` creates external blockers from the design doc's Section 11.3 as pending tasks with descriptions noting they are external dependencies. Call `TaskList` and identify any such tasks. For each one:
+- Ask the user if this external dependency has been resolved.
+- If **resolved**: mark the task as `completed` so downstream tasks unblock.
+- If **not resolved**: warn the user that tasks blocked by this dependency will be skipped. List which tasks are affected.
+
+**Check GitHub issues.** Search the repo's GitHub issues for any labeled `blocker` or `blocking` that are still open. Also search for issues whose title or body references the plan slug or the product name. Present any matches to the user:
+```
+Found open blocking issues:
+  #42  "Third-party OAuth provider API not yet available" [blocker]
+       → Blocks tasks: #5, #6, #8
+
+  #51  "Database schema approval pending from DBA team" [blocker]
+       → Blocks tasks: #2, #3
+```
+
+For each blocking issue:
+- Ask the user if it's been resolved (the issue may be open but the blocker may be cleared).
+- If resolved: suggest closing the GitHub issue and mark any corresponding external dependency tasks as `completed`.
+- If not resolved: confirm the user wants to proceed with a partial implementation (skipping blocked tasks). Note which tasks will be skipped.
+
+**If all blockers are resolved**, proceed. If some remain, proceed with the unblocked subset and note the skipped tasks prominently in the readiness summary.
+
+#### 0.3 — Dependency installation script
 
 Check if `scripts/install_pkgs.sh` exists.
 
@@ -50,7 +78,7 @@ Make the script executable (`chmod +x`).
 
 **If it exists**, read it and confirm it covers the tech stack from the design doc. If the design doc references tools not in the script, flag this to the user.
 
-#### 0.3 — SessionStart hooks
+#### 0.4 — SessionStart hooks
 
 Check if `.claude/settings.json` exists and contains a `SessionStart` hook that runs `install_pkgs.sh`.
 
@@ -75,7 +103,7 @@ Check if `.claude/settings.json` exists and contains a `SessionStart` hook that 
 
 If the file already exists with other settings, merge — do not overwrite existing configuration.
 
-#### 0.4 — CI configuration
+#### 0.5 — CI configuration
 
 Check if `.github/workflows/` contains a CI workflow.
 
@@ -110,19 +138,20 @@ Adapt the workflow to the project's language and test framework. Keep it minimal
 
 **If it exists**, read it and confirm it runs the test suite. Flag any gaps (e.g., E2E tests in the plan but not in CI).
 
-#### 0.5 — Git branch
+#### 0.6 — Git branch
 
 Create a feature branch for this implementation if not already on one:
 - Branch name: `implement/<slug>` where `<slug>` matches the plan file slug.
 - If the user is already on a feature branch, confirm they want to use it.
 
-#### 0.6 — Readiness confirmation
+#### 0.7 — Readiness confirmation
 
 Present a summary of the environment setup:
+- Blockers: all resolved / <N> unresolved (listing skipped tasks)
 - Install script: ✓ / created
-- SessionStart hooks: ✓ / created  
+- SessionStart hooks: ✓ / created
 - CI workflow: ✓ / created
-- Task list: <N> tasks loaded, <M> unblocked
+- Task list: <N> tasks loaded, <M> unblocked, <K> skipped due to blockers
 - Branch: `implement/<slug>`
 - Task list ID: `<CLAUDE_CODE_TASK_LIST_ID>`
 
@@ -145,6 +174,13 @@ Wave 1 — 4 tasks available:
   #3  Implement auth middleware            [M] [api]
   #5  Add rate limiting config             [S] [infrastructure]
   #7  Create health check endpoint         [S] [api]
+```
+
+If some tasks remain blocked by unresolved external dependencies (from Phase 0.2), note them separately:
+```
+Blocked (skipped this run):
+  #8  Integrate OAuth provider SDK         [M] [api]       — blocked by #42 (external)
+  #9  Add SSO login flow                   [M] [frontend]  — blocked by #42 (external)
 ```
 
 #### 1.2 — Check for file conflicts
@@ -229,7 +265,7 @@ When all tasks in a wave pass verification:
 
 ### Phase 3: Full Suite Validation
 
-After all tasks are completed and verified:
+After all implementable tasks are completed and verified (excluding any skipped due to unresolved blockers):
 
 #### 3.1 — Run the full test suite
 
@@ -253,7 +289,7 @@ Push the feature branch and confirm CI passes. If CI fails:
 #### 3.3 — Automated summary
 
 Present a summary of everything that was implemented:
-- Total tasks completed.
+- Total tasks completed (and how many were skipped due to blockers).
 - Files created / modified (from `git diff --stat` against the base branch).
 - Test results (pass count, coverage if available).
 - CI status.
@@ -274,6 +310,8 @@ Build a checklist based on:
 - **Cross-browser / cross-device testing** if applicable.
 - **Performance / load considerations** from the design doc's infrastructure section.
 - **Security items** that need manual review (auth flows, permission boundaries).
+
+Only include items relevant to the tasks that were actually implemented — skip items related to tasks that were blocked and skipped.
 
 Present the checklist to the user:
 ```
@@ -336,10 +374,15 @@ Save a completion report as `docs/implement-<slug>.md`:
 **CI Status:** ✅ Passing / ❌ Failing
 
 ## Summary
-- Tasks completed: <N>/<total>
+- Tasks completed: <N>/<total> (<K> skipped due to unresolved blockers)
 - Files changed: <count>
 - Tests passing: <count>
 - Test coverage: <percentage if available>
+
+## Blocker Status
+| Blocker | Source | Status | Skipped Tasks |
+|---------|--------|--------|---------------|
+| <description> | GitHub #<number> / Plan risk | Unresolved | #<task IDs> |
 
 ## Manual Verification Results
 | # | Check | Result | Issue |
@@ -355,13 +398,14 @@ Save a completion report as `docs/implement-<slug>.md`:
 ## Next Steps
 - [ ] Review and merge PR
 - [ ] Address filed issues in next sprint
+- [ ] Resolve remaining blockers and re-run /build:implement for skipped tasks
 - [ ] <any other follow-ups>
 ```
 
 Present the report to the user and tell them:
 - The feature branch is ready for PR review.
 - Any filed issues are tracked in GitHub.
-- They can re-run `/build:implement` to pick up remaining or fix tasks.
+- If blockers were unresolved, they can resolve them and re-run `/build:implement` to pick up the skipped tasks.
 
 ---
 
