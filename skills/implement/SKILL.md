@@ -140,9 +140,10 @@ Adapt the workflow to the project's language and test framework. Keep it minimal
 
 #### 0.6 — Git branch
 
-Create a feature branch for this implementation if not already on one:
-- Branch name: `implement/<slug>` where `<slug>` matches the plan file slug.
-- If the user is already on a feature branch, confirm they want to use it.
+Check the current Git branch:
+- If already on a feature branch, confirm the user wants to use it.
+- If on `main` (or the repo's default branch), ask the user whether they'd like to create a feature branch (`implement/<slug>` where `<slug>` matches the plan file slug) or continue working on the current branch.
+- Only create the branch if the user confirms.
 
 #### 0.7 — Readiness confirmation
 
