@@ -1,5 +1,5 @@
 {
   "name": "build",
-  "version": "1.4.0",
-  "description": "Claude Code plugin for the full software development lifecycle. Includes interactive PRD builder (/build:prd), technical design document builder (/build:design), implementation planner (/build:plan), and implementation executor (/build:implement) with TDD two-phase dispatch (test-first + implement), specialized worker profiles (backend/frontend/infra), multi-lens verification (correctness/security/quality with Opus for security review), optional visual UI testing, and wave checkpointing."
+  "version": "1.5.0",
+  "description": "Claude Code plugin for the full software development lifecycle. Includes interactive PRD builder (/build:prd), technical design document builder (/build:design), implementation planner (/build:plan), implementation executor (/build:implement) with TDD dispatch and multi-lens verification, and documentation generator (/build:docs) that produces developer docs and user docs with accuracy verification and optional visual capture."
 }
