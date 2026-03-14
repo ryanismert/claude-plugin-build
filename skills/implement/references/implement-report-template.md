@@ -7,6 +7,7 @@
 **PRD:** [prd-{slug}.md](../docs/prd-{slug}.md)
 **CI Status:** {✅ Passing / ❌ Failing}
 **Commit Range:** {base_sha}..{head_sha}
+**Wave Checkpoints:** {wave-<slug>-1-complete, wave-<slug>-2-complete, ...}
 
 ---
 
@@ -20,23 +21,26 @@
 | Lines added | {lines_added} |
 | Lines removed | {lines_removed} |
 | Tests passing | {test_count} |
+| Tests written (TDD) | {tdd_test_count} |
 | Test coverage | {coverage}% |
 | Retry count | {tasks_retried} tasks needed re-dispatch |
+| Security issues found | {security_issues} (all resolved before merge) |
+| Visual checks | {visual_pass}/{visual_total} passed ({visual_skip} skipped) |
 
 ---
 
 ## Execution Log
 
 ### Wave 1: {description}
-| Task ID | Subject | Status | Attempts | Notes |
-|---------|---------|--------|----------|-------|
-| {id} | {subject} | ✅ | 1 | — |
-| {id} | {subject} | ✅ | 2 | Failed verification: {reason}. Fixed on retry. |
+| Task ID | Subject | Worker Profile | Status | Attempts | Correctness | Security | Quality | Visual | Notes |
+|---------|---------|---------------|--------|----------|-------------|----------|---------|--------|-------|
+| {id} | {subject} | backend | ✅ | 1 | ✅ | ✅ | ✅ | N/A | — |
+| {id} | {subject} | frontend | ✅ | 2 | ✅ | ❌→✅ | ✅ | ✅ | Security: XSS in input handler. Fixed on retry. |
 
 ### Wave 2: {description}
-| Task ID | Subject | Status | Attempts | Notes |
-|---------|---------|--------|----------|-------|
-| {id} | {subject} | ✅ | 1 | — |
+| Task ID | Subject | Worker Profile | Status | Attempts | Correctness | Security | Quality | Visual | Notes |
+|---------|---------|---------------|--------|----------|-------------|----------|---------|--------|-------|
+| {id} | {subject} | general | ✅ | 1 | ✅ | ✅ | ✅ | N/A | — |
 
 {Repeat for each wave.}
 

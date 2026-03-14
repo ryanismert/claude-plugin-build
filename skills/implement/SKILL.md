@@ -162,7 +162,7 @@ Ask the user to confirm before proceeding to execution. Commit any generated fil
 
 ### Phase 1: Task Dispatch
 
-Load the task list and begin executing in waves.
+Load the task list and begin executing in waves using a TDD two-phase approach.
 
 #### 1.1 — Identify the current wave
 
@@ -171,10 +171,10 @@ Call `TaskList` and find all tasks with status `pending` that have no unresolved
 Group the wave by component/phase (from task metadata) and present it:
 ```
 Wave 1 — 4 tasks available:
-  #1  Create user migration script        [S] [data-layer]
-  #3  Implement auth middleware            [M] [api]
-  #5  Add rate limiting config             [S] [infrastructure]
-  #7  Create health check endpoint         [S] [api]
+  #1  Create user migration script        [S] [data-layer]   → backend worker
+  #3  Implement auth middleware            [M] [api]          → backend worker
+  #5  Add rate limiting config             [S] [infrastructure] → infra worker
+  #7  Create health check endpoint         [S] [api]          → backend worker
 ```
 
 If some tasks remain blocked by unresolved external dependencies (from Phase 0.2), note them separately:
@@ -184,33 +184,99 @@ Blocked (skipped this run):
   #9  Add SSO login flow                   [M] [frontend]  — blocked by #42 (external)
 ```
 
-#### 1.2 — Check for file conflicts
+#### 1.2 — Select worker profiles
+
+For each task in the wave, select a worker profile by reading `references/worker-profiles.md` and matching the task's `component` metadata tag against the profile selection table. If the task description contains file paths, also check those against the file pattern column. If no match is found, use the `general` profile.
+
+Show the profile assignments in the wave summary (as in 1.1 above).
+
+#### 1.3 — Check for file conflicts
 
 Before dispatching, check if any tasks in the wave modify the same files (based on the file paths in their descriptions). If two tasks touch the same files, serialize them — dispatch one first and add the other to the next wave.
 
 Present any conflicts to the user and explain why they're being serialized.
 
-#### 1.3 — Dispatch workers
+#### 1.4 — Phase A: Test writing (RED)
 
-For each task in the wave, spawn a subagent using the `Task` tool:
+The test writer prompt is defined inline here (not in a reference file) because test writing is a single discipline that doesn't vary by task type — unlike implementation, which uses specialized worker profiles from `references/worker-profiles.md`.
+
+For each task in the wave, spawn a test-writer subagent:
 
 ```
-Task({
+Agent({
   subagent_type: "general-purpose",
-  description: "Implement task #<id>: <subject>",
-  prompt: <worker prompt — see Worker Prompt Template below>,
+  model: "sonnet",
+  description: "Write failing tests for task #<id>: <subject>",
+  prompt: <see Test Writer Prompt below>,
   run_in_background: true
 })
 ```
 
-All tasks in a wave are dispatched simultaneously with `run_in_background: true` for parallel execution.
+All test-writer agents in a wave are dispatched simultaneously.
 
-For remote execution, remind the user they can also dispatch waves to the web:
+**Test Writer Prompt:**
+
+````
+You are a test architect writing tests for a feature that has NOT been implemented yet. Your tests MUST fail when you run them — that is the whole point. You are writing the specification, not the implementation.
+
+Task ID: #<id>
+Subject: <subject>
+Description:
+<full task description, including acceptance criteria>
+
+Test command: <test command from CI config>
+
+Instructions:
+1. Read the task description carefully. Each acceptance criterion becomes one or more test cases.
+2. Read existing test files in the project to understand the testing patterns, frameworks, and conventions used.
+3. Write test cases that:
+   - Cover every acceptance criterion in the task description.
+   - Test edge cases mentioned in the description.
+   - Follow the project's existing test patterns and naming conventions.
+   - Are specific and descriptive in their test names (the name should describe the expected behavior).
+4. Run the tests. They MUST fail. If any test passes, you have either:
+   - Written a trivially true assertion (fix the test), or
+   - Discovered the feature already exists (note this in your report).
+5. Commit the failing tests with message: "test(<component>): add failing tests for <subject> [task-<id>]"
+6. Report what you wrote: list each test case, what it tests, and confirm it fails.
+
+IMPORTANT:
+- Do NOT write any implementation code. Only tests.
+- Do NOT write tests that pass. Every test must fail with a meaningful error (not found, not defined, assertion failed, etc.).
+- Do NOT stub or mock the feature you are testing — test the real interface as described in the acceptance criteria.
+````
+
+Wait for all test-writer agents to complete. If any test-writer agent reports issues (couldn't determine test patterns, ambiguous acceptance criteria), surface these to the user before proceeding.
+
+#### 1.5 — Phase B: Implementation (GREEN)
+
+After all tests are written and confirmed failing, spawn implementer subagents using the selected worker profile:
+
 ```
-CLAUDE_CODE_TASK_LIST_ID=<id> claude --remote "Pick up unblocked tasks and implement them"
+Agent({
+  subagent_type: "general-purpose",
+  model: "sonnet",
+  description: "Implement task #<id>: <subject>",
+  prompt: <worker prompt from selected profile in references/worker-profiles.md>,
+  run_in_background: true
+})
 ```
 
-#### 1.4 — Monitor progress
+Append this additional instruction block to the selected worker profile prompt:
+
+````
+IMPORTANT — TDD context:
+Failing tests have already been written for this task. Your job is to make them pass.
+- Run the tests FIRST to see what is expected.
+- Write the minimal code to make each test pass.
+- Do NOT modify the existing test files unless a test has a genuine bug (wrong import path, typo in fixture name). If you believe a test is wrong, note it in your commit message but still try to make it pass.
+- After all tests pass, run the full test suite to check for regressions.
+- Only then commit and mark the task complete.
+````
+
+All implementer agents in a wave are dispatched simultaneously with `run_in_background: true`.
+
+#### 1.6 — Monitor progress
 
 Periodically call `TaskList` to check for status changes. When a task moves to `completed`:
 - Note it in the conversation.
@@ -221,46 +287,136 @@ When a task appears stuck or fails:
 - Check if the subagent is still running.
 - If it failed, note the error and ask the user whether to retry or skip.
 
+For remote execution, remind the user they can also dispatch waves to the web:
+```
+CLAUDE_CODE_TASK_LIST_ID=<id> claude --remote "Pick up unblocked tasks and implement them"
+```
+
 ---
 
 ### Phase 2: Verification
 
-After each wave completes, verify the work before moving to the next wave.
+After each wave completes, verify the work with parallel multi-lens review before moving to the next wave.
 
-#### 2.1 — Automated verification
+#### 2.1 — Dispatch parallel reviewers
 
-Spawn a verification subagent for each completed task in the wave:
+Read `references/reviewer-profiles.md` for the three reviewer prompt templates. For each completed task in the wave, spawn all three reviewers in parallel:
 
 ```
-Task({
+Agent({
   subagent_type: "general-purpose",
-  description: "Verify task #<id>: <subject>",
-  prompt: <verification prompt — see Verification Prompt Template below>,
+  model: "sonnet",
+  description: "Correctness review: task #<id>",
+  prompt: <correctness reviewer prompt from references/reviewer-profiles.md>,
+  run_in_background: true
+})
+
+Agent({
+  subagent_type: "general-purpose",
+  model: "opus",
+  description: "Security review: task #<id>",
+  prompt: <security reviewer prompt from references/reviewer-profiles.md>,
+  run_in_background: true
+})
+
+Agent({
+  subagent_type: "general-purpose",
+  model: "sonnet",
+  description: "Quality review: task #<id>",
+  prompt: <quality reviewer prompt from references/reviewer-profiles.md>,
   run_in_background: true
 })
 ```
 
-The verification agent:
-- Pulls the latest code.
-- Runs the test suite (unit + integration tests relevant to this task).
-- Runs linting and type checking.
-- Confirms the files listed in the task description were actually modified.
-- Checks that any new tests were written (if the task description calls for them).
+This means a wave of 4 tasks spawns 12 reviewer agents (3 per task), all running in parallel.
 
-#### 2.2 — Handle verification failures
+#### 2.2 — Visual verification (frontend tasks only)
+
+For tasks that matched the `frontend` worker profile, spawn an additional visual verification agent **after** the three standard reviewers complete (it needs the implementation to be confirmed working first):
+
+```
+Agent({
+  subagent_type: "general-purpose",
+  model: "sonnet",
+  description: "Visual verification: task #<id>",
+  prompt: <see Visual Verification Prompt below>,
+  run_in_background: true
+})
+```
+
+**Visual Verification Prompt:**
+
+````
+You are a visual QA engineer verifying that a frontend task renders correctly. You did NOT write this code.
+
+Task ID: #<id>
+Subject: <subject>
+Expected visual behavior:
+<acceptance criteria related to UI appearance, layout, responsiveness from task description>
+
+Instructions:
+1. Start the dev server if not already running (check the project's package.json for the dev/start script).
+2. Navigate to the relevant page or component using the browser tools available to you.
+3. Take a snapshot (accessibility tree) to verify the DOM structure is correct.
+4. Take a screenshot to verify the visual appearance.
+5. If the task mentions responsive behavior or mobile support, resize the viewport to mobile dimensions (375x667) and take another screenshot.
+6. Check the browser console for JavaScript errors or warnings.
+7. Evaluate what you see against the acceptance criteria.
+
+Report your findings:
+- PASS: Visual output matches acceptance criteria. Describe what you verified.
+- FAIL: Describe what looks wrong. Include:
+  - What you expected to see (from acceptance criteria)
+  - What you actually see (describe the visual issue)
+  - Whether there are console errors
+  - Screenshots taken (reference them in your report)
+
+Do NOT fix any issues. Only report them.
+
+NOTE: If no browser automation tools are available (no Chrome DevTools MCP, no Playwright), report SKIP with the reason. Visual verification is optional — the task can still pass based on the other three reviewers.
+````
+
+Visual verification is **opt-in and gracefully degraded**:
+- Only runs for frontend-tagged tasks.
+- Only runs if browser tools (Chrome DevTools MCP, Playwright) are available.
+- If unavailable, the visual reviewer reports SKIP and the task is judged on the other three reviewers alone.
+- Never blocks a task from passing when browser tools aren't configured.
+
+#### 2.3 — Handle verification failures
+
+Aggregate results from all reviewers for each task. A task's verification status is:
+
+- **PASS**: All required reviewers (correctness + security + quality) passed. Visual passed or was skipped.
+- **FAIL**: Any required reviewer reported FAIL.
 
 If verification fails for a task:
+- Present the failure details from each failing reviewer to the user.
 - Reopen the task: `TaskUpdate(taskId: "<id>", status: "pending")`
-- Update the task description with the failure details so the next worker has context.
-- The task will be picked up in the next wave.
-- Inform the user which tasks failed verification and why.
+- Update the task description by appending the failure details so the next worker has context:
+  ```
+  --- VERIFICATION FAILURE (attempt <N>) ---
+  Correctness: <PASS/FAIL + details>
+  Security: <PASS/FAIL + details>
+  Quality: <PASS/FAIL + details>
+  Visual: <PASS/FAIL/SKIP + details>
+  ```
+- The task will be picked up in the next wave with this additional context.
+- Inform the user which tasks failed and why.
+- If a task fails verification 3 times, escalate to the user and ask whether to skip it, modify the acceptance criteria, or debug manually.
 
-#### 2.3 — Wave completion
+#### 2.4 — Wave checkpoint and commit
 
 When all tasks in a wave pass verification:
 - Commit the wave's changes with a descriptive message: `feat(<component>): implement <summary> [tasks #X, #Y, #Z]`
+- Tag the commit: `git tag wave-<slug>-<N>-complete` (where `<slug>` matches the plan file slug and N is the wave number within this implementation run).
 - Push to the feature branch.
 - Proceed to the next wave (back to Phase 1).
+
+If a subsequent wave fails catastrophically (multiple tasks fail verification repeatedly), the user can roll back to the previous wave checkpoint:
+```
+git reset --hard wave-<slug>-<N-1>-complete
+```
+Present this option to the user if the situation arises — never execute it automatically.
 
 ---
 
@@ -410,64 +566,15 @@ Present the report to the user and tell them:
 
 ---
 
-## Worker Prompt Template
+## Prompt Templates
 
-When spawning a subagent for a task, use this prompt structure:
+Worker and reviewer prompt templates are maintained in separate reference files for clarity:
 
-```
-You are implementing a single task from a larger project. Here is your task:
+- **Worker profiles:** `references/worker-profiles.md` — Four specialized worker prompts (backend, frontend, infrastructure, general) with profile selection logic based on task component metadata.
+- **Reviewer profiles:** `references/reviewer-profiles.md` — Three parallel reviewer prompts (correctness, security, quality) plus the visual verification prompt.
+- **Test writer prompt:** Defined inline in Phase 1.4 above — the test writer is always the same regardless of task type, since test writing is a single discipline.
 
-Task ID: #<id>
-Subject: <subject>
-Description:
-<full task description from TaskCreate, including file paths, acceptance criteria, and tech details>
-
-Instructions:
-1. Call TaskUpdate(taskId: "<id>", status: "in_progress") to claim the task.
-2. Read the relevant existing files mentioned in the description.
-3. Implement the changes described.
-4. Write tests as specified in the acceptance criteria.
-5. Run the relevant tests and fix any failures.
-6. Run the linter/type checker and fix any errors.
-7. Commit your changes with message: "feat(<component>): <subject> [task-<id>]"
-8. Call TaskUpdate(taskId: "<id>", status: "completed") only after all tests pass.
-
-If you encounter an issue you cannot resolve:
-- Do NOT mark the task as completed.
-- Leave the task as in_progress.
-- Write a clear description of what went wrong in a comment in the code or in the commit message.
-
-Do not modify files outside the scope of this task.
-Do not refactor code unrelated to this task.
-Do not install new dependencies unless the task description explicitly calls for them.
-```
-
-## Verification Prompt Template
-
-When spawning a verification subagent:
-
-```
-You are verifying that a task was implemented correctly. You did NOT write this code — your job is to independently confirm it works.
-
-Task ID: #<id>
-Subject: <subject>
-Expected changes:
-<file paths and acceptance criteria from task description>
-
-Verification steps:
-1. Check that the files listed in the task description were actually modified (git diff).
-2. Read the modified files and confirm the implementation matches the acceptance criteria.
-3. Run the relevant tests: <test command>
-4. Run linting: <lint command>
-5. Run type checking: <type check command>
-6. If new tests were expected, confirm they exist and cover the acceptance criteria.
-
-Report your findings:
-- PASS: All checks passed. State what you verified.
-- FAIL: Describe what failed and why. Be specific — include file names, test output, and the acceptance criterion that wasn't met.
-
-Do NOT fix any issues. Only report them.
-```
+When dispatching agents, read the appropriate reference file to get the current prompt template. Do not hardcode prompt text — always read from the reference file so that template updates take effect immediately.
 
 ## Conversation Style
 
