@@ -1,7 +1,6 @@
 ---
 name: implement
 description: Executes the task graph created by /build:plan. Sets up the execution environment, dispatches workers to implement tasks, verifies completions, and guides the user through final manual verification with GitHub issue filing for any bugs found.
-disable-model-invocation: true
 ---
 
 # Implementation Executor

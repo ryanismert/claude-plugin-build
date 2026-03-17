@@ -1,7 +1,6 @@
 ---
 name: prd
 description: Interactive product requirements document builder. Takes a short product idea and iteratively clarifies scope, users, features, and constraints through structured Q&A until a complete PRD markdown file can be generated.
-disable-model-invocation: true
 ---
 
 # Product Requirements Document Builder

@@ -1,7 +1,6 @@
 ---
 name: plan
 description: Reads a technical design document and hydrates Claude Code's native Task system with a full dependency graph of work items. Bridges the gap between design and implementation by creating persistent, dependency-aware tasks that can be picked up by implementation agents or remote execution.
-disable-model-invocation: true
 ---
 
 # Implementation Planner

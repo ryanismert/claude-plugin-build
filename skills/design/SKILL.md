@@ -1,7 +1,6 @@
 ---
 name: design
 description: Interactive technical design document builder. Takes an existing PRD and iteratively develops a comprehensive technical design through structured Q&A, codebase exploration, and architecture discussion. Produces a single design doc with sufficient detail to drive task breakdown and implementation planning.
-disable-model-invocation: true
 ---
 
 # Technical Design Document Builder

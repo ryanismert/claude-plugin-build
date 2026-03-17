@@ -1,7 +1,6 @@
 ---
 name: docs
 description: Generates project documentation from pipeline artifacts (PRD, design doc, implementation report) and the codebase. Produces developer docs (API reference, architecture, contributing guide) in docs/ and user docs (user guide, configuration reference) in public-docs/ for GitHub Pages. Run after /build:implement to close the documentation loop.
-disable-model-invocation: true
 ---
 
 # Documentation Generator
