@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Executes the task graph created by /build:plan. Sets up the execution environment, dispatches workers to implement tasks, verifies completions, and guides the user through final manual verification with GitHub issue filing for any bugs found.
+description: Executes the task graph created by /build:plan. Sets up the execution environment, dispatches workers to implement tasks, verifies completions, and runs browser-driven E2E verification with automatic fix attempts for code bugs.
 ---
 
 # Implementation Executor
@@ -453,71 +453,127 @@ Present a summary of everything that was implemented:
 
 ---
 
-### Phase 4: Manual Verification & Issue Filing
+### Phase 4: Browser-Driven Verification
 
-This is the final phase. The user performs manual verification that automated tests can't cover. Your job is to guide them through it and file GitHub issues for anything that needs follow-up.
+This is the final phase. A browser agent verifies end-to-end flows that automated unit/integration tests don't cover. Items the browser can't verify are reported for manual follow-up.
 
-#### 4.1 — Generate the manual verification checklist
+#### 4.1 — Generate the classified verification checklist
 
-Build a checklist based on:
-- **PRD acceptance criteria** that aren't covered by automated tests (read the source PRD linked in the plan).
+Build a checklist from:
+- **PRD acceptance criteria** not covered by automated tests (read the source PRD linked in the plan).
 - **Design doc UX flows** or user-facing behavior described in the design doc.
-- **E2E scenarios** that require human judgment (visual correctness, UX feel, edge cases).
+- **E2E scenarios** (visual correctness, multi-step interactions, edge cases).
 - **Cross-browser / cross-device testing** if applicable.
 - **Performance / load considerations** from the design doc's infrastructure section.
 - **Security items** that need manual review (auth flows, permission boundaries).
 
-Only include items relevant to the tasks that were actually implemented — skip items related to tasks that were blocked and skipped.
+Only include items relevant to tasks that were actually implemented — skip items related to blocked/skipped tasks.
 
-Present the checklist to the user:
+**Classify each item:**
+- **Tag by type:** `flow`, `interaction`, `visual`, `performance`, `security`, `external`
+- **Classify as:** browser-verifiable or manual-only
+- **Order browser-verifiable items** into dependency chains (e.g., registration before auth-dependent flows, since later flows need the account created by earlier ones)
+
+Present the classified checklist to the user:
 ```
-Manual Verification Checklist:
+Verification Checklist:
 
-□ 1. User registration flow — complete signup, verify email arrives, confirm login works
-□ 2. Auth token refresh — let a session sit for >15min, confirm seamless refresh
-□ 3. Rate limiting — hit the API rapidly, confirm 429 responses and correct headers
-□ 4. Mobile responsiveness — check key pages on phone viewport
-□ 5. Error states — trigger validation errors, confirm user-friendly messages
-□ 6. Performance — page load under 2s on throttled connection
+Browser-verifiable:
+  1. [flow] User registration — signup, verify redirect to dashboard, confirm session
+  2. [flow] Auth token refresh — login, wait, confirm seamless refresh
+  3. [interaction] Rate limiting — hit API endpoint rapidly, confirm 429 shown in UI
+  4. [visual] Mobile responsiveness — check key pages at 375x667 viewport
+  5. [interaction] Error states — trigger validation errors, confirm user-friendly messages
+
+Manual-only:
+  6. [performance] Page load under 2s on throttled connection
+  7. [security] Permission boundaries — confirm admin-only routes reject regular users
+  8. [external] Email delivery — verify signup confirmation email arrives
 ```
 
-#### 4.2 — Walk through each item
+#### 4.2 — Browser agent execution
 
-For each checklist item:
-- Tell the user exactly what to do and what to look for.
-- Ask them to report the result: **pass**, **fail**, or **skip**.
-- If **pass**: mark it done and move on.
-- If **skip**: note it as untested.
-- If **fail**: immediately gather details.
+Spawn a single browser verification agent with the full ordered list of browser-verifiable items. The agent works through items sequentially in a single browser session, building on prior state (accounts created, sessions established).
 
-#### 4.3 — File GitHub issues for failures
+```
+Agent({
+  subagent_type: "general-purpose",
+  model: "sonnet",
+  description: "Browser verification: E2E flows",
+  prompt: <see Browser Verification Prompt below>,
+  run_in_background: false
+})
+```
 
-For each failed verification item, file a GitHub issue using the GitHub API:
+**Browser Verification Prompt:**
 
-- **Title**: Clear, specific description of the bug (e.g., "Auth token refresh fails silently after 15-minute idle")
-- **Body** should include:
-  - **Description**: What was tested and what went wrong.
-  - **Steps to reproduce**: The exact steps the user took.
-  - **Expected behavior**: What should have happened (from PRD/design doc).
-  - **Actual behavior**: What the user observed.
-  - **Environment**: Branch, commit SHA, browser/device if relevant.
-  - **Related tasks**: Link to the task IDs that implemented this feature.
-  - **Design doc reference**: Link to the relevant section of the design doc.
-  - **Severity**: Critical / High / Medium / Low (ask the user).
-- **Labels**: `bug`, plus any project-specific labels the user wants.
-- **Assignees**: Ask the user if issues should be assigned to anyone, or left unassigned.
+````
+You are a QA engineer verifying end-to-end flows in a browser. You did NOT write this code.
 
-Confirm each issue with the user before filing: show them the title and body, ask if anything should be adjusted.
+Checklist items (execute in order):
+<ordered list of browser-verifiable items with acceptance criteria>
 
-#### 4.4 — For skipped items
+Dev server start command: <command from project config>
 
-For any checklist items the user skipped, ask if they want to:
-- File a GitHub issue as a "needs-testing" item so it doesn't get lost.
-- Ignore it for now.
+Instructions:
+1. Start the dev server if not already running.
+2. For each checklist item, in order:
+   a. Navigate to the relevant page or starting point.
+   b. Execute the multi-step interaction (fill forms, click buttons, follow redirects).
+   c. At key checkpoints: take a snapshot (accessibility tree) and/or screenshot.
+   d. Check the browser console for JavaScript errors or warnings.
+   e. Evaluate the outcome against the acceptance criteria.
+   f. If PASS — record it and move to the next item.
+   g. If FAIL — evaluate whether the issue is a fixable code bug:
+      - Fixable (wrong CSS, missing text, broken link, validation error, incorrect redirect):
+        attempt the fix, re-run the verification for this item, record the result.
+      - Not fixable (design mismatch, missing feature, unclear requirement):
+        record as FAIL with details, do not attempt a fix.
+   h. If ERROR (page won't load, browser tool failure): record as ERROR.
+      If this item is a dependency for later items, mark those as SKIPPED.
+3. After all items are complete, report results for each item.
 
-File tracking issues for any they want to keep, with the label `needs-testing` instead of `bug`.
+For each item, report one of:
+- PASS: Verification succeeded. Describe what you verified.
+- PASS (fixed): Failed initially, you fixed it, now passes. Describe the fix (file, line, what changed).
+- FAIL: Could not fix or fix didn't work. Include:
+  - What you expected (from acceptance criteria)
+  - What actually happened
+  - Screenshots taken
+  - Console errors if any
+- ERROR: Could not complete verification. Describe why.
+- SKIPPED: Blocked by a prior item's failure. State which item blocked it.
 
-#### 4.5 — Final report
+Fix boundary — use this two-part test:
+1. Do the acceptance criteria for this item unambiguously specify the correct behavior?
+2. Is the fix a localized code change (fewer than ~20 lines, single file)?
+If BOTH are true, attempt the fix. Otherwise, report as FAIL.
+Examples of fixable: wrong CSS property, missing error message text, incorrect redirect URL, off-by-one in validation.
+Examples of not fixable: feature works but the flow feels wrong, acceptance criteria are ambiguous, fix would require multi-file architectural changes.
+
+After any fix:
+- Wait for the dev server to hot-reload (or restart it if hot-reload is not available).
+- Re-run the verification for that item to confirm the fix works.
+- Run the project's test command to check for regressions.
+- Commit the fix: "fix: <description> [phase-4-verification]"
+- Note all fixes in your report so they appear in the final summary.
+````
+
+**Graceful degradation:**
+
+If no browser tools are available (no Chrome DevTools MCP, no Playwright):
+- Do NOT spawn the browser agent.
+- Mark all browser-verifiable items as `SKIPPED — no browser tools configured`.
+- Inform the user: "Browser verification skipped — no browser automation tools detected. The following items need manual verification:" followed by the list.
+- Proceed directly to the final report.
+
+**Handling cascading failures:**
+
+If an item fails in a way that prevents subsequent dependent items (e.g., registration fails so login-dependent flows can't run), the agent marks downstream items as `SKIPPED — blocked by item #N failure` rather than attempting them.
+
+**Early abort:** If the first 3 items all result in ERROR (not FAIL — ERROR means the agent couldn't even complete the verification, e.g., dev server won't start, app crashes on load), abort browser verification entirely. Report the root cause to the user rather than mechanically marking every remaining item as SKIPPED.
+
+#### 4.3 — Final report
 
 Save a completion report as `docs/implement-<slug>.md`:
 
@@ -527,7 +583,7 @@ Save a completion report as `docs/implement-<slug>.md`:
 **Date:** <date>
 **Branch:** implement/<slug>
 **Plan:** [plan-<slug>.md](../docs/plan-<slug>.md)
-**CI Status:** ✅ Passing / ❌ Failing
+**CI Status:** Passing / Failing
 
 ## Summary
 - Tasks completed: <N>/<total> (<K> skipped due to unresolved blockers)
@@ -540,28 +596,40 @@ Save a completion report as `docs/implement-<slug>.md`:
 |---------|--------|--------|---------------|
 | <description> | GitHub #<number> / Plan risk | Unresolved | #<task IDs> |
 
-## Manual Verification Results
-| # | Check | Result | Issue |
-|---|-------|--------|-------|
-| 1 | <description> | ✅ Pass | — |
-| 2 | <description> | ❌ Fail | #<issue number> |
-| 3 | <description> | ⏭ Skip | #<issue number> (needs-testing) |
+## Verification Results
+| # | Check | Type | Result | Details |
+|---|-------|------|--------|---------|
+| 1 | <description> | flow | PASS | Signup, redirect, session verified |
+| 2 | <description> | flow | PASS (fixed) | Fixed redirect URL in auth callback |
+| 3 | <description> | visual | FAIL | Dashboard sidebar overlaps at 375px |
+| 4 | <description> | external | MANUAL | Requires manual verification |
+| 5 | <description> | interaction | SKIPPED | Blocked by item #1 failure |
 
-## Issues Filed
-- #<number>: <title> [bug]
-- #<number>: <title> [needs-testing]
+## Fixes Applied
+| File | Change | Checklist Item |
+|------|--------|----------------|
+| src/auth/callback.ts:42 | Fixed redirect URL from /home to /dashboard | #2 |
 
 ## Next Steps
 - [ ] Review and merge PR
-- [ ] Address filed issues in next sprint
+- [ ] Manually verify items marked MANUAL
+- [ ] Address items marked FAIL
 - [ ] Resolve remaining blockers and re-run /build:implement for skipped tasks
 - [ ] <any other follow-ups>
 ```
 
+**Post-fix test run:** If any fixes were applied during Phase 4.2, run the full test suite before generating the report. Update the CI Status and Tests passing fields to reflect the post-fix state. If a fix caused a test regression, note it in the report.
+
 Present the report to the user and tell them:
 - The feature branch is ready for PR review.
-- Any filed issues are tracked in GitHub.
+- Any fixes applied during verification are noted in the report.
+- Items marked MANUAL still need human verification.
 - If blockers were unresolved, they can resolve them and re-run `/build:implement` to pick up the skipped tasks.
+
+**Opt-in issue filing:** After presenting the report, ask: "Want me to file GitHub issues for any of the failures?" If the user agrees, draft issues for each FAIL item using this format and show them for approval before filing:
+- **Title**: Clear, specific description (e.g., "Dashboard sidebar overlaps content at mobile viewport")
+- **Body**: Description, steps to reproduce, expected vs actual behavior, environment (branch, commit SHA), related task IDs, design doc reference, severity
+- **Labels**: `bug`
 
 ---
 
@@ -570,7 +638,7 @@ Present the report to the user and tell them:
 Worker and reviewer prompt templates are maintained in separate reference files for clarity:
 
 - **Worker profiles:** `references/worker-profiles.md` — Four specialized worker prompts (backend, frontend, infrastructure, general) with profile selection logic based on task component metadata.
-- **Reviewer profiles:** `references/reviewer-profiles.md` — Three parallel reviewer prompts (correctness, security, quality) plus the visual verification prompt.
+- **Reviewer profiles:** `references/reviewer-profiles.md` — Three parallel reviewer prompts (correctness, security, quality).
 - **Test writer prompt:** Defined inline in Phase 1.4 above — the test writer is always the same regardless of task type, since test writing is a single discipline.
 
 When dispatching agents, read the appropriate reference file to get the current prompt template. Do not hardcode prompt text — always read from the reference file so that template updates take effect immediately.
@@ -581,5 +649,5 @@ When dispatching agents, read the appropriate reference file to get the current 
 - Show progress clearly — use the wave/task structure to keep the user oriented.
 - When environment setup is needed (Phase 0), be helpful and generate complete files — don't leave placeholders for the user to fill in.
 - During dispatch (Phase 1), keep the user informed but don't ask for permission on every task — they already approved the plan.
-- During manual verification (Phase 4), be thorough but efficient. Don't make the user repeat information — pull context from the PRD and design doc.
-- When filing issues, generate complete, well-structured bug reports. The user should only need to confirm, not compose.
+- During browser verification (Phase 4), keep the user informed of progress and results. Pull context from the PRD and design doc — don't ask the user for information you already have.
+- When offering to file issues, generate complete, well-structured bug reports. The user should only need to confirm, not compose.
